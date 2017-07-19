@@ -15,16 +15,8 @@ import sys
 from sklearn.model_selection import StratifiedShuffleSplit
 from feature_format import featureFormat, targetFeatureSplit
 
-PERF_FORMAT_STRING = "\n Accuracy: {:>0.{display_precision}f}\n " \
-                     "Precision: {:>0.{display_precision}f}\n   " \
-                     "Recall: {:>0.{display_precision}f}\n       " \
-                     "F1: {:>0.{display_precision}f}\n       " \
-                     "F2: {:>0.{display_precision}f}"
-RESULTS_FORMAT_STRING = "Total predictions: {:4d}\n   " \
-                        "True positives: {:4d}\n  " \
-                        "False positives: {:4d}\n  " \
-                        "False negatives: {:4d}\n   " \
-                        "True negatives: {:4d}"
+PERF_FORMAT_STRING = "\n Accuracy: {:>0.{display_precision}f}\nPrecision: {:>0.{display_precision}f}\n   Recall: {:>0.{display_precision}f}\n       F1: {:>0.{display_precision}f}\n       F2: {:>0.{display_precision}f}"
+RESULTS_FORMAT_STRING = "Total predictions: {:4d}\n   True positives: {:4d}\n  False positives: {:4d}\n  False negatives: {:4d}\n   True negatives: {:4d}"
 
 
 def test_classifier(clf, dataset, feature_list, n_splits=1000):
