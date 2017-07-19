@@ -21,10 +21,11 @@ Recall: {:>0.{display_precision}f}\tF1: {:>0.{display_precision}f}\tF2: {:>0.{di
 RESULTS_FORMAT_STRING = "\tTotal predictions: {:4d}\tTrue positives: {:4d}\tFalse positives: {:4d}\
 \tFalse negatives: {:4d}\tTrue negatives: {:4d}"
 
-def test_classifier(clf, dataset, feature_list, folds = 1000):
+def test_classifier(clf, dataset, feature_list, n_splits=1000):
     data = featureFormat(dataset, feature_list, sort_keys = True)
     labels, features = targetFeatureSplit(data)
-    cv = StratifiedShuffleSplit(labels, folds, random_state = 42)
+    sss = StratifiedShuffleSplit(n_splits, random_state = 42)
+    cv = sss.split(features, labels)
     true_negatives = 0
     false_negatives = 0
     true_positives = 0
