@@ -1,16 +1,19 @@
-#!/usr/bin/python
+#!/usr/bin/python3.6
 
 
 import pickle
 import numpy as np
 import pandas as pd
+import warnings
 
-# utilities
+# cross validation
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import GridSearchCV
+from sklearn.decomposition import PCA
 
 # pre-processing
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.feature_selection import SelectKBest
 
 # machine learning
 from sklearn.linear_model import LogisticRegression
@@ -20,7 +23,9 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
 
-from tester import dump_classifier_and_data
+# evaluation
+from tester import dump_classifier_and_data, load_classifier_and_data, test_classifier
+from sklearn.model_selection import cross_val_predict
 
 """
 Data Preparation
@@ -38,21 +43,43 @@ cols = df.columns.tolist()
 cols.insert(0, cols.pop(cols.index('poi')))
 df = df.reindex(columns = cols)
 
+def data_info():
+    print('Number of persons:', len(df.index))
+    print('Number of features:', len(df.columns))
+    print('Number of data points:', len(df.index) * len(df.columns))
+    print('Number of POIs:', len(df[df['poi'] == True]))
+    print('Number of non-POIs:', len(df[df['poi'] == False]))
+
+
+print('\n\n==============\nOriginal Dataset Info:\n\n',df.columns)
+data_info()
+
 ### Task 1: Select what features you'll use.
 ### Task 2: Remove outliers
 ### Task 3: Create new feature(s) and  feature processing
 
-# NaN and outliers
-df.replace('NaN', np.nan, inplace = True)
-df = df.fillna(0)
-df = df.drop(['LOCKHART EUGENE E','TOTAL','THE TRAVEL AGENCY IN THE PARK'], axis=0)
-
-
 """
 Feature Engineering
 """
+
+# count NaN numbers
+df.replace('NaN', np.nan, inplace = True)
+features_nan_count = df.isnull().sum(axis = 0).sort_values(ascending=False)
+person_nan_count = df.isnull().sum(axis = 1).sort_values(ascending=False)
+
+print('\n\n==============\nTop 10 features NaN:\n\n',features_nan_count[:10])
+print('\nTop 10 person NaN:\n\n',person_nan_count[:10])
+
+# process NaN and remove outliers
+df = df.fillna(0)
+df = df.drop(['LOCKHART EUGENE E','TOTAL','THE TRAVEL AGENCY IN THE PARK'], axis=0)
+
+print('\n\n==============\nProcessed Dataset Info:\n\n',df.columns)
+data_info()
+
+
 # remove useless feature
-df = df.drop(['email_address'], axis=1)
+df = df.drop(['email_address'], axis=1) # email address has no useful info
 
 # create new features
 df['from_poi_rate'] = df['from_poi_to_this_person'] / df['to_messages']
@@ -64,22 +91,52 @@ df['sent_to_poi_rate'] = df['sent_to_poi_rate'].fillna(0)
 df['shared_with_poi_rate'] = df['shared_receipt_with_poi'] / df['to_messages']
 df['shared_with_poi_rate'] = df['shared_with_poi_rate'].fillna(0)
 
-# log-scaling for original features
-
-for col in df.columns[1:]:
-    df[col] = [np.log(abs(v)) if v != 0 else 0 for v in df[col]]
-
-
 df_features = df.drop('poi', axis=1)
 df_labels = df['poi']
 
 
 
+# feature selection-KBest
+k_best = SelectKBest(k='all')
+k_best.fit(df_features, df_labels)
+
+print('\n\n==============\nFeatures KBest Score:\n',pd.DataFrame(
+    k_best.scores_,index=df_features.columns.tolist(),columns=['score']).sort_values('score', ascending=False))
+
+
+# log-scaling for all original features
+for col in df.columns[1:]:
+    df[col] = [np.log(abs(v)) if v != 0 else 0 for v in df[col]]
+
+
+
 ### Task 4: Try a varity of classifiers
+### Please name your classifier clf for easy export below.
+### Note that if you want to do PCA or other multi-stage operations,
+### you'll need to use Pipelines. For more info:
+### http://scikit-learn.org/stable/modules/pipeline.html
+
+
+### Task 5: Tune your classifier to achieve better than .3 precision and recall
+### using our testing script. Check the tester.py script in the final project
+### folder for details on the evaluation method, especially the test_classifier
+### function. Because of the small size of the dataset, the script uses
+### stratified shuffle split cross validation. For more info:
+### http://scikit-learn.org/stable/modules/generated/sklearn.cross_validation.StratifiedShuffleSplit.html
+
+
+
+"""
+Hyperparameter with GridSearchCV 
+"""
+
+df_features = df.drop('poi', axis=1)
+df_labels = df['poi']
+
 
 algorithms = [
     GaussianNB(),
-    LogisticRegression(class_weight='balanced', random_state=42),
+    LogisticRegression(class_weight='balanced',random_state=42),
     make_pipeline(MinMaxScaler(), SVC(class_weight='balanced', random_state=42)),
     DecisionTreeClassifier(class_weight='balanced', random_state=42),
     RandomForestClassifier(class_weight='balanced', random_state=42),
@@ -116,58 +173,47 @@ params = [
     }
 ]
 
+dataset = df.to_dict(orient='index')
+feature_list = ['poi'] + df_features.columns.tolist()
+
+
 best_estimator = None  # will contain final best algorithm
 best_score = 0  # will contain final estimated best performance score
 
 # perform actual iteration and testing (GridSearch)
+print('\n\n==============\nChoose Bset Model for each Algorithm (F1 Score):\n')
+warnings.filterwarnings('ignore') # ignore f1 error warning
 for ii, algorithm in enumerate(algorithms):
     # GridSearch also performs CrossValidation to automatically generate training and testing sets of data
-    grid_search = GridSearchCV(algorithm, params[ii],cv=5)
-    grid_search.fit(df_features, df_labels)
+    model = GridSearchCV(algorithm, params[ii],scoring = 'f1',cv=5)
+    model.fit(df_features, df_labels)
 
-    best_estimator_ii = grid_search.best_estimator_
-    best_score_ii = grid_search.best_score_
+    # Evaluate every model
+
+    best_estimator_ii = model.best_estimator_
+    best_score_ii = model.best_score_
+
+    print('------------\nF1 Score:',best_score_ii,'\n')
+
+    test_classifier(best_estimator_ii, dataset, feature_list)
 
     if best_score_ii > best_score:
         best_estimator = best_estimator_ii
         best_score = best_score_ii
 
 
-
-clf = best_estimator  # store for later
-print('best estimator is: \n',clf)
-
+clf =  best_estimator
+print('\n\n==============\nThe Highest F1 Score Model:\n',clf)
 
 
-### Task 5: Tune your classifier to achieve better than .3 precision and recall 
-### using our testing script. Check the tester.py script in the final project
-### folder for details on the evaluation method, especially the test_classifier
-### function. Because of the small size of the dataset, the script uses
-### stratified shuffle split cross validation. For more info: 
-### http://scikit-learn.org/stable/modules/generated/sklearn.cross_validation.StratifiedShuffleSplit.html
 
-# Example starting point. Try investigating other evaluation techniques!
-from sklearn.model_selection import cross_val_predict
+### Task 6: Dump your classifier, dataset, and features_list
 
-# evaluate model using cross validation
-predictions = cross_val_predict(clf, df_features, df_labels, cv=5)  # StratifiedKFold
+"""
+Dump Classifier and Data
+"""
 
-# interesting metrics in this case are Recall and Precision.
-# Recall is the number of true POIs that were included in our predicted POIs
-# Precision is the number of true positives (true POIs) in our predicted POIs
-# Additionally, the F1 score combines both Recall and Precision into a metric that varies from 0 (worst) to 1 (best)
+dataset = df.to_dict(orient='index')
+feature_list = ['poi'] + df_features.columns.tolist()
+dump_classifier_and_data(clf, dataset, feature_list )
 
-from sklearn.metrics import accuracy_score,f1_score, recall_score, precision_score
-
-print('accuracy  :', accuracy_score(df_labels, predictions))
-print('f1        :', f1_score(df_labels, predictions))
-print('precision :', precision_score(df_labels, predictions))
-print('recall    :', recall_score(df_labels, predictions))
-
-
-### Task 6: Dump your classifier, dataset, and features_list so anyone can
-### check your results. You do not need to change anything below, but make sure
-### that the version of poi_id.py that you submit can be run on its own and
-### generates the necessary .pkl files for validating your results.
-
-dump_classifier_and_data(clf, df, df_features)
