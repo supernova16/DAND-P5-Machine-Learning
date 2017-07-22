@@ -1,3 +1,4 @@
+#!/usr/bin/python3.6
 #!/usr/bin/pickle
 
 """ a basic script for importing student's POI identifier,
