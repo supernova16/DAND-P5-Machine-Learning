@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3.6
 
 """ 
     A general tool for converting data from the
