@@ -21,7 +21,7 @@
 - 邮件数据：https://github.com/udacity/ud120-projects/tree/master/final_project/emails_by_address
 - 财务数据：http://news.findlaw.com/hdocs/docs/enron/enron61702insiderpay.pdf
 
-邮件数据和财务数据均由 Uda 的导师 Katie 整理出，最终在整合了成了 `final_project_dataset.pkl` 。
+邮件数据和财务数据均由 Uda 的导师 @Katie 整理出，最终整合成了 `final_project_dataset.pkl` 。
 
 ### 环境
 
